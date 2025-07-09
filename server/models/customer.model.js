@@ -1,37 +1,58 @@
 const mongoose = require('mongoose');
 
 const customerSchema = new mongoose.Schema({
-    userId: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
-        required: true 
+    customerId: {
+        type: String,
+        required: true,
+        unique: true,
     },
-    totalBalance: { 
-        type: Number, 
-        default: 0 
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
     },
-    name: { 
-        type: String, 
-        required: true 
+    totalBalance: {
+        type: Number,
+        default: 0
     },
-    phoneNumber: { 
-        type: String, 
-        match: /^\+?[1-9]\d{1,14}$/ 
+    name: {
+        type: String,
+        required: true
     },
-    email: { 
-        type: String, 
-        match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ 
+    phoneNumber: {
+        type: String,
+        match: /^\+?[1-9]\d{1,14}$/
+    },
+    email: {
+        type: String,
+        match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     },
     address: String,
-    status: { 
-        type: String, 
-        enum: ['active', 'inactive'], 
-        default: 'active' 
+    status: {
+        type: String,
+        enum: ['active', 'inactive'],
+        default: 'active'
     },
     lastTransactionDate: Date
 }, { timestamps: true });
 
-customerSchema.index({ userId: 1 });
-customerSchema.index({ userId: 1, phoneNumber: 1 }, { unique: true, sparse: true });
+// Custom UID generation
+customerSchema.pre('save', async function (next) {
+    if (this.customerId) return next(); // avoid regenerating
 
-module.exports = mongoose.model("Customer", customerSchema);
+    try {
+        const lastCustomer = await mongoose.model('Customer').findOne(
+        { userId: this.userId },
+        {},
+        { sort: { createdAt: -1 } }
+        );
+
+        const lastId = lastCustomer?.customerId?.replace(/[^\d]/g, '') || '10000';
+        this.customerId = `CUST${parseInt(lastId) + 1}`;
+        next();
+    } catch (error) {
+        next(error);
+  }
+});
+
+module.exports = mongoose.model('Customer', customerSchema);
